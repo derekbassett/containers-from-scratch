@@ -164,7 +164,7 @@ No luck, but the reason why this isn't working is because in order to change the
 
 ##### 8. Re-run with Fork/Exec
 
-Modify the program
+Modify the program `main.go`
 ```go
 package main
 

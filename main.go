@@ -1,4 +1,5 @@
 // This main.go can only be built on Linux.
+// +build linux
 
 package main
 
@@ -24,9 +25,7 @@ func main() {
 }
 
 func run() {
-	fmt.Printf("running %v as PID %d\n", os.Args[2:], os.Getpid())
-
-	cmd := exec.Command(os.Args[2], os.Args[3:]...)
+	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
 
 	// Setup Stdin, Stdout, Stderr
 	cmd.Stdin = os.Stdin
