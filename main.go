@@ -7,6 +7,9 @@ import (
 )
 
 func main() {
+	if len(os.Args) < 2 {
+		panic("You must have commnad line two arguments")
+	}
 	switch os.Args[1] {
 	case "run":
 		run()
@@ -16,7 +19,7 @@ func main() {
 }
 
 func run() {
-	fmt.Printf("running %v\n", os.Args[2:])
+	fmt.Printf("Running %v\n", os.Args[2:])
 
 	cmd := exec.Command(os.Args[2], os.Args[3:]...)
 

@@ -39,21 +39,47 @@ $ vagrant box update
 
 ```shell
 $ vagrant ssh
-vagrant@ubuntu-xenial:~$ sudo su
+vagrant@ubuntu-xenial:~$ sudo -i
+root@ubuntu-xenial:~# cd /src
+```
+
+3. First example with No isolation
+
+```shell
+root@ubuntu-xenial:/src# go run main.go run echo "Hello World"
+Running [echo Hello World]
+Hello World
+```
+
+4. Run bash with no isolation from inside a container
+
+```shell
+root@ubuntu-xenial:/src# go run main.go run /bin/bash
+Running [/bin/bash]
+root@ubuntu-xenial:/src# hostname
+ubuntu-xenial
+root@ubuntu-xenial:/src# hostname demo
+root@ubuntu-xenial:/src# hostname
+demo
+root@ubuntu-xenial:/src# exit
+exit
+root@ubuntu-xenial:/src# hostname
+demo
+root@ubuntu-xenial:/src#
+```
+
+The hostname was changed in the host.
+
+5. Re-running with UTS isolation
+
+Add the following to main.go
+
+```go
 
 ```
 
 
 ## Installation
 
-You must have [Vagrant](https://www.vagrantup.com/downloads.html) and [Virtual Box](https://www.virtualbox.org/wiki/Downloads) installed.
-
-To build simply run
-```script
-go build ./...
-```
-
-To run simply call
-```script
-go run main.go run
-```
+You must have [Vagrant](https://www.vagrantup.com/downloads.html) and 
+[Virtual Box](https://www.virtualbox.org/wiki/Downloads) installed.
