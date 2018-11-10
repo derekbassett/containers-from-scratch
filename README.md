@@ -1,8 +1,9 @@
 # Building container from scratch using Go
 
-> Building containers from scratch using Go as seen from @lizrice presentation at DockerCon 2017
+> Building containers from scratch using Go 
  
-This code will not build on Mac or Windows it will only work with GOOS=Linux, hence why we include the Vagrant files.
+This code will not build on Mac or Windows instead it will only work with GOOS=Linux, hence why we include the Vagrant files.
+See instructions at the bottom to get Vagrant configured for your system.
 
 ## Links:
 
@@ -177,7 +178,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		panic("You must have commnad line two arguments")
+		panic("You must have at least two commnad line arguments")
 	}
 	switch os.Args[1] {
 	case "run":
@@ -219,8 +220,8 @@ func must(err error) {
 		panic(err)
 	}
 }
-
 ```
+
 1. Duplicate the `run` function and create a `child` function.
 
 1. The run command `exec.Command` function executes `/proc/self/exe` creates a slice starting with the string `"child"`, and then copies
@@ -231,6 +232,140 @@ which adds it to the slice.  The outer `...` unwinds the slice as variable argum
 
 1. Now modify `main` to call `child` if first argument is `child`
 
+Run the command again
+
+```shell
+root@ubuntu-xenial:/src# go run main.go run /bin/bash
+running [/bin/bash] as PID 1
+root@ubuntu-xenial:/src#
+```
+
+But if we run `ps` we still have the same list of processes
+
+```
+root@ubuntu-xenial:/src# ps
+  PID TTY          TIME CMD
+ 1930 pts/0    00:00:00 sudo
+ 1931 pts/0    00:00:00 bash
+ 2116 pts/0    00:00:00 go
+ 2149 pts/0    00:00:00 main
+ 2153 pts/0    00:00:00 exe
+ 2157 pts/0    00:00:00 bash
+ 2167 pts/0    00:00:00 ps
+root@ubuntu-xenial:/src# exit
+exit
+root@ubuntu-xenial:/src#
+```
+
+`ps` looks in `/proc` instead of at the process itself.  In order for `ps` to correctly work we need to generate
+it's own file system.
+
+##### 9. Generate an isolated filesystem
+
+Included in the Vagrant file system are five root filesystems.  Alpine, Centos, Debian, Fedora, Ubuntu.  This example will
+use Ubuntu but you can select the version you want based on rootfs.
+
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"syscall"
+)
+
+func main() {
+	if len(os.Args) < 2 {
+		panic("You must have at least two commnad line arguments")
+	}
+	switch os.Args[1] {
+	case "run":
+		run()
+	case "child":
+		child()
+	default:
+		panic("what???")
+	}
+}
+
+func run() {
+	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
+
+	// Setup Stdin, Stdout, Stderr
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
+		Unshareflags: syscall.CLONE_NEWNS,
+	}
+	must(cmd.Run())
+}
+
+func child() {
+	fmt.Printf("running %v as PID %d\n", os.Args[2:], os.Getpid())
+
+	cmd := exec.Command(os.Args[2], os.Args[3:]...)
+
+	// Setup Stdin, Stdout, Stderr
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	
+	must(syscall.Sethostname([]byte("container")))
+	must(syscall.Chroot("/rootfs-ubuntu"))
+	must(os.Chdir("/"))
+	must(syscall.Mount("proc", "proc", "proc", 0, ""))
+	must(cmd.Run())
+	must(syscall.Unmount("proc", 0))
+}
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+```
+
+1. Add a new flag to `Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,` in SysProcAttr
+
+1. Add a new flag `Unshareflags: syscall.CLONE_NEWNS,` in SysProcAttr
+
+1. Add the following Commands into `child`
+    1. Set the container name using `must(syscall.Sethostname([]byte("container")))`
+    1. Set the root directory using `must(syscall.Chroot("/rootfs-ubuntu"))`
+    1. Set the current working directory using `must(os.Chdir("/"))`
+    1. Mount the directory `/proc` using `must(syscall.Mount("proc", "proc", "proc", 0, ""))`
+    1. Unmount the director `/proc` after the command is completed `must(syscall.Unmount("proc", 0))`
+    
+
+```shell
+root@ubuntu-xenial:/src# ls /
+bin   etc                   initrd.img  lost+found  opt   rootfs-alpine  rootfs-fedora  sbin  srv  usr
+boot  home                  lib         media       proc  rootfs-centos  rootfs-ubuntu  snap  sys  var
+dev   I_AM_THE_HOST_ROOTFS  lib64       mnt         root  rootfs-debian  run            src   tmp  vmlinuz
+root@ubuntu-xenial:/src# go run main.go run /bin/bash
+running [/bin/bash] as PID 1
+root@container:/# ps
+  PID TTY          TIME CMD
+    1 ?        00:00:00 exe
+    5 ?        00:00:00 bash
+   10 ?        00:00:00 ps
+root@container:/# ls
+I_AM_A_ROOT_FS  bin  boot  dev  etc  home  lib  lib64  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var
+root@container:/# exit
+exit
+root@ubuntu-xenial:/src#
+```
+
+##### 10. Adding CGroup controls
+
+CGroups allow control of the contained process.  We are going to add some simple cgroup functionality to constrain 
+
+```go
+
+```
 
 ## Installation
 
