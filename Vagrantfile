@@ -75,7 +75,7 @@ Vagrant.configure("2") do |config|
     apt-get update
     apt-get upgrade -y
     # apt-get install -y qemu-user-static debootstrap binfmt-support
-    
+
     # install the latest go
     wget https://dl.google.com/go/go1.11.2.linux-amd64.tar.gz
     tar -zxvf go1.11.2.linux-amd64.tar.gz -C /usr/local/
@@ -86,20 +86,8 @@ Vagrant.configure("2") do |config|
     echo "export PATH=$PATH:/usr/local/go/bin" | tee -a /root/.bashrc
 
     # decompressing other rootfs (alpine, centos, debian, fedora, ubuntu)
-    mkdir -p /rootfs-alpine/
-    mkdir -p /rootfs-centos/proc/
-    mkdir -p /rootfs-debian/
-    mkdir -p /rootfs-fedora/proc/
     mkdir -p /rootfs-ubuntu/
     touch /I_AM_THE_HOST_ROOTFS
-    tar -xzvf /src/alpine-rootfs.tar.gz -C /rootfs-alpine/
-    touch /rootfs-alpine/I_AM_CONTAINER_ROOT_FS
-    tar -xzvf /src/centos-rootfs.tar.gz -C /rootfs-centos/
-    touch /rootfs-centos/I_AM_CONTAINER_ROOT_FS
-    tar -xzvf /src/debian-rootfs.tar.gz -C /rootfs-debian/
-    touch /rootfs-debian/I_AM_CONTAINER_ROOT_FS
-    tar -xzvf /src/fedora-rootfs.tar.gz -C /rootfs-fedora/
-    touch /rootfs-fedora/I_AM_CONTAINER_ROOT_FS
     tar -xzvf /src/ubuntu-rootfs.tar.gz -C /rootfs-ubuntu/
     touch /rootfs-ubuntu/I_AM_CONTAINER_ROOT_FS
 
