@@ -53,6 +53,47 @@ Running [echo Hello World]
 Hello World
 ```
 
+```go
+// This main.go can only be built on Linux.
+// +build linux
+
+package main
+
+import (
+    "fmt"
+	"os"
+)
+
+// go run main.go run <cmd> <args>
+func main() {
+	if len(os.Args) < 2 {
+		panic("You must have at least two commnad line arguments")
+	}
+	switch os.Args[1] {
+	case "run":
+		run()
+	default:
+		panic("unknown command")
+	}
+}
+
+func run() {
+	fmt.Printf("running %v as PID %d\n", os.Args[2:], os.Getpid())
+
+	// Setup Stdin, Stdout, Stderr
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	must(cmd.Run())
+}
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+```
+
 #### 4. Hostname isolation
 
 ##### Break it: Run bash with no isolation from inside a container
@@ -274,8 +315,7 @@ it's own file system.
 
 ##### Fix it: Generate an isolated filesystem
 
-Included in the Vagrant file system are five root filesystems.  Alpine, Centos, Debian, Fedora, Ubuntu.  This example will
-use Ubuntu but you can select the version you want based on rootfs.
+Included in the Vagrant file system with another root filesystem.  
 
 Step 1: Add the following Commands into `child`
 Step 2: Set the root directory using `must(syscall.Chroot("/rootfs-ubuntu"))`
