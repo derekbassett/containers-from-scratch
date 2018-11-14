@@ -1,1 +1,1 @@
-module github.com/derekbassett/minidock
+module github.com/derekbassett/containers-from-scratch
