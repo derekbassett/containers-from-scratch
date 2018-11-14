@@ -93,15 +93,15 @@ Vagrant.configure("2") do |config|
     mkdir -p /rootfs-ubuntu/
     touch /I_AM_THE_HOST_ROOTFS
     tar -xzvf /src/alpine-rootfs.tar.gz -C /rootfs-alpine/
-    touch /rootfs-alpine/I_AM_A_ROOT_FS
+    touch /rootfs-alpine/I_AM_CONTAINER_ROOT_FS
     tar -xzvf /src/centos-rootfs.tar.gz -C /rootfs-centos/
-    touch /rootfs-centos/I_AM_A_ROOT_FS
+    touch /rootfs-centos/I_AM_CONTAINER_ROOT_FS
     tar -xzvf /src/debian-rootfs.tar.gz -C /rootfs-debian/
-    touch /rootfs-debian/I_AM_A_ROOT_FS
+    touch /rootfs-debian/I_AM_CONTAINER_ROOT_FS
     tar -xzvf /src/fedora-rootfs.tar.gz -C /rootfs-fedora/
-    touch /rootfs-fedora/I_AM_A_ROOT_FS
+    touch /rootfs-fedora/I_AM_CONTAINER_ROOT_FS
     tar -xzvf /src/ubuntu-rootfs.tar.gz -C /rootfs-ubuntu/
-    touch /rootfs-ubuntu/I_AM_A_ROOT_FS
+    touch /rootfs-ubuntu/I_AM_CONTAINER_ROOT_FS
 
   SHELL
 end
