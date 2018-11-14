@@ -1,1 +1,1 @@
-module github.com/derekbassett/container-from-scratch
+module github.com/derekbassett/containers-from-scratch
