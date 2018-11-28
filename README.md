@@ -23,7 +23,7 @@ $ vagrant up
 ```
 This will take a while and will:
 * Install the latest version of Go
-* Untar root filesystems for alpine, centos, debian, fedora, ubuntu
+* Untar root filesystems for ubuntu
  
 If it fails due to internet connection re-run with
 
@@ -38,6 +38,8 @@ $ vagrant box update
 ```
 
 ##### 2. Accessing the Ubuntu Host VM
+
+Need to be running as Root
 
 ```shell
 $ vagrant ssh
@@ -54,14 +56,12 @@ Hello World
 ```
 
 ```go
-// This main.go can only be built on Linux.
-// +build linux
-
 package main
 
 import (
     "fmt"
 	"os"
+    "os/exec"
 )
 
 // go run main.go run <cmd> <args>
@@ -80,6 +80,7 @@ func main() {
 func run() {
 	fmt.Printf("running %v as PID %d\n", os.Args[2:], os.Getpid())
 
+    cmd := exec.Command(os.Args[2], os.Args[3:]...)
 	// Setup Stdin, Stdout, Stderr
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -558,5 +559,5 @@ In an alternate container run `ps aux`
 
 ## Installation
 
-You must have [Vagrant](https://www.vagrantup.com/downloads.html) and 
+You must have [Git](https://gist.github.com/derhuerst/1b15ff4652a867391f03), [Vagrant](https://www.vagrantup.com/downloads.html) and 
 [Virtual Box](https://www.virtualbox.org/wiki/Downloads) installed.
