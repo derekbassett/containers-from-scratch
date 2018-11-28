@@ -1,7 +1,7 @@
 # Building container from scratch using Go
 
-> Building containers from scratch using Go 
- 
+> Building containers from scratch using Go
+
 This code will not build on Mac or Windows instead it will only work with GOOS=Linux, hence why we include the Vagrant files.
 See instructions at the bottom to get Vagrant configured for your system.
 
@@ -23,8 +23,8 @@ $ vagrant up
 ```
 This will take a while and will:
 * Install the latest version of Go
-* Untar root filesystems for alpine, centos, debian, fedora, ubuntu
- 
+* Untar root filesystems for ubuntu
+
 If it fails due to internet connection re-run with
 
 ```
@@ -39,6 +39,8 @@ $ vagrant box update
 
 ##### 2. Accessing the Ubuntu Host VM
 
+Need to be running as Root
+
 ```shell
 $ vagrant ssh
 vagrant@ubuntu-xenial:~$ sudo -i
@@ -51,6 +53,46 @@ root@ubuntu-xenial:~# cd /src
 root@ubuntu-xenial:/src# go run main.go run echo "Hello World"
 Running [echo Hello World]
 Hello World
+```
+
+```go
+package main
+
+import (
+    "fmt"
+	"os"
+    "os/exec"
+)
+
+// go run main.go run <cmd> <args>
+func main() {
+	if len(os.Args) < 2 {
+		panic("You must have at least two commnad line arguments")
+	}
+	switch os.Args[1] {
+	case "run":
+		run()
+	default:
+		panic("unknown command")
+	}
+}
+
+func run() {
+	fmt.Printf("running %v as PID %d\n", os.Args[2:], os.Getpid())
+
+    cmd := exec.Command(os.Args[2], os.Args[3:]...)
+	// Setup Stdin, Stdout, Stderr
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	must(cmd.Run())
+}
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
 ```
 
 #### 4. Hostname isolation
@@ -86,7 +128,7 @@ Step 1: Add the following to main.go a `syscall` in the imports, and the followi
 ```
     cmd.SysProcAttr = &syscall.SysProcAttr{
         Cloneflags: syscall.CLONE_NEWUTS,
-    } 
+    }
 ```
 
 `syscall.CLONE_NEWUTS` stands for clone new Unix Time Sharing System.
@@ -172,7 +214,7 @@ No luck, but the reason why this isn't working is because in order to change the
 Step 1: Duplicate the `run` function and create a `child` function.
 
 Step 2: The run command `exec.Command` function executes `/proc/self/exe` creates a slice starting with the string `"child"`, and then copies
-all the arguments from the second command line argument on, that is what the inner `...` is for, into the `append` function 
+all the arguments from the second command line argument on, that is what the inner `...` is for, into the `append` function
 which adds it to the slice.  The outer `...` unwinds the slice as variable arguments into Command.
 
 Step 3:. Remove `cmd.SysProcAttr` in the `child` function, since the namespace has already been setup.
@@ -239,7 +281,7 @@ func child() {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-    must(syscall.Sethostname([]byte("container"))) 
+    must(syscall.Sethostname([]byte("container")))
 	must(cmd.Run())
 }
 
@@ -274,15 +316,14 @@ it's own file system.
 
 ##### Fix it: Generate an isolated filesystem
 
-Included in the Vagrant file system are five root filesystems.  Alpine, Centos, Debian, Fedora, Ubuntu.  This example will
-use Ubuntu but you can select the version you want based on rootfs.
+Included in the Vagrant file system with another root filesystem.  
 
 Step 1: Add the following Commands into `child`
 Step 2: Set the root directory using `must(syscall.Chroot("/rootfs-ubuntu"))`
 Step 3: Set the current working directory using `must(os.Chdir("/"))`
 Step 4: Mount the directory `/proc` using `must(syscall.Mount("proc", "proc", "proc", 0, ""))`
 Step 5: Unmount the director `/proc` after the command is completed `must(syscall.Unmount("proc", 0))`
-    
+
 ```shell
 root@ubuntu-xenial:/src# ls /
 bin   etc                   initrd.img  lost+found  opt   rootfs-alpine  rootfs-fedora  sbin  srv  usr
@@ -348,7 +389,7 @@ func child() {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	must(syscall.Sethostname([]byte("container")))
 	must(syscall.Chroot("/rootfs-ubuntu"))
 	must(os.Chdir("/"))
@@ -365,24 +406,13 @@ func must(err error) {
 ```
 
 **Potential exploit**
+Check out this potential exploit at this Gist https://gist.github.com/derekbassett/c67c0b129804c55ec3ce2cbdf1412985
 
-Step 1. Run inside the container
-```
-    export LOCATION="SFS in Denver"
-    sleep 1000
-```
-Step 2. Run outside the container in the main window
-```
-    cat /proc/`pgrep sleep`/environ | tr '\0' '\n'
-```
-The cat command provides you with a list of environment variables.  So if you are following [The Twelve-Factor App](https://12factor.net)
-your secrets can be exposed to the host container.
-
-#### 7. CGroup 
+#### 7. CGroup
 
 What can they use
 Namespaces are what you can see. CGroups what you can use, and allow you to control the resources.  
- 
+
 Follow along with the group:
 
 ```script
@@ -421,9 +451,16 @@ func cg(name string) {
 	must(ioutil.WriteFile(filepath.Join(pids, name, "cgroup.procs"), []byte(strconv.Itoa(os.Getpid())), 0700))
 }
 ```
-Step 2: Add the following line to `child()` 
+Step 2: Add the following line to `child()`
 ```
     cg("scratch")
+```
+Step 3: Add the following import
+```
+    "io/ioutil"
+    "path/filepath"
+    "strconv"
+
 ```
 
 ```go
@@ -514,9 +551,9 @@ root@ubuntu-xenial:/src# go run main.go run /bin/bash
 running [/bin/bash] as PID 1
 root@container:/# :() { : | : & }; :
 ```
-In an alternate container run `ps aux` 
+In an alternate container run `ps aux`
 
 ## Installation
 
-You must have [Vagrant](https://www.vagrantup.com/downloads.html) and 
+You must have [Git](https://gist.github.com/derhuerst/1b15ff4652a867391f03), [Vagrant](https://www.vagrantup.com/downloads.html) and
 [Virtual Box](https://www.virtualbox.org/wiki/Downloads) installed.
