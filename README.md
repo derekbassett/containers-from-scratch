@@ -37,6 +37,10 @@ If the box becomes outdated run
 $ vagrant box update
 ```
 
+Worse case scenario sometimes the box can get into a wonky state if it has been weeks since you
+ have run the demo.  If that happens, delete the box and rerun `vagrant up`.  This is also the
+likely fix if source files in this directory do not appear under `/src` in the vagrant box. 
+
 ##### 2. Accessing the Ubuntu Host VM
 
 Need to be running as Root
