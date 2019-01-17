@@ -13,6 +13,7 @@ See instructions at the bottom to get Vagrant configured for your system.
   - Liz Rice talk at Golang UK Conference 2016: https://www.youtube.com/watch?v=HPuvDm8IC-4
   - Liz Rice talk at Container Camp UK 2016: https://www.youtube.com/watch?v=Utf-A4rODH8
   - Wellington Silva Containers from Scratch Demo https://github.com/wsilva/container-from-scratch-demo
+  - Eli Uriegas How Docker Images Work: Union File Systems For Dummies https://www.terriblecode.com/blog/how-docker-images-work-union-file-systems-for-dummies/
 
 ## Demo:
 
@@ -54,45 +55,6 @@ root@ubuntu-xenial:~# cd /src
 We are going to start with a very basic application.  Takes in a set of command line arguments and executes a command.
 
 [embedmd]:# (step_1_no_isolation.go)
-```go
-package main
-
-import (
-	"fmt"
-	"os"
-	"os/exec"
-)
-
-// go run step_1_no_isolation.go run <cmd> <args>
-func main() {
-	if len(os.Args) < 2 {
-		panic("You must have at least two command line arguments")
-	}
-	switch os.Args[1] {
-	case "run":
-		run()
-	default:
-		panic("unknown command")
-	}
-}
-
-func run() {
-	fmt.Printf("running %v as PID %d\n", os.Args[2:], os.Getpid())
-
-	cmd := exec.Command(os.Args[2], os.Args[3:]...)
-	// Setup Stdin, Stdout, Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	must(cmd.Run())
-}
-
-func must(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-```
 
 ```shell
 root@ubuntu-xenial:/src# go run main.go run echo "Hello World"
@@ -132,23 +94,10 @@ root@ubuntu-xenial:/src# hostname ubuntu-xenial
 Step 1: Add the following to main.go a `syscall` in the imports, and the following after `cmd.Stderr = os.Stderr`
 
 [embedmd]:# (step_2_hostname_isolation.go /cmd.SysProcAttr/ /\}/)
-```go
-cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS,
-	}
-```
 
 And the following to the import section
 
 [embedmd]:# (step_2_hostname_isolation.go /import/ /\)/)
-```go
-import (
-	"fmt"
-	"os"
-	"os/exec"
-	"syscall"
-)
-```
 
 `syscall.CLONE_NEWUTS` stands for clone new Unix Time Sharing System and the import section is required to access the syscall
 package.
@@ -202,11 +151,6 @@ The list of processes include the parent process
 Add the following to the main.go inside the `SysProcAttr`
 
 [embedmd]:# (step_3_process_isolation.go /cmd.SysProcAttr/ /\}/)
-```go
-cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID,
-	}
-```
 
 ```shell
 root@ubuntu-xenial:/src# ps
@@ -248,54 +192,6 @@ Step 5: Set the container name using `must(syscall.Sethostname([]byte("container
 The functions are now:
 
 [embedmd]:# (step_3_process_isolation.go /func main/ $)
-```go
-func main() {
-	if len(os.Args) < 2 {
-		panic("You must have at least two commnad line arguments")
-	}
-	switch os.Args[1] {
-	case "run":
-		run()
-	case "child":
-		child()
-	default:
-		panic("what???")
-	}
-}
-
-func run() {
-	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
-
-	// Setup Stdin, Stdout, Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID,
-	}
-	must(cmd.Run())
-}
-
-func child() {
-	fmt.Printf("running %v as PID %d\n", os.Args[2:], os.Getpid())
-
-	cmd := exec.Command(os.Args[2], os.Args[3:]...)
-
-	// Setup Stdin, Stdout, Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	must(syscall.Sethostname([]byte("container")))
-	must(cmd.Run())
-}
-
-func must(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-```
 
 Run the command again
 
@@ -307,53 +203,7 @@ root@container:/src#
 
 The command now is now correctly running as PID 1
 
-Modify the program `main.go`
-```go
-package main
-
-import (
-	"fmt"
-	"os"
-	"os/exec"
-	"syscall"
-)
-
-
-func run() {
-	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
-
-	// Setup Stdin, Stdout, Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID,
-	}
-	must(cmd.Run())
-}
-
-func child() {
-	fmt.Printf("running %v as PID %d\n", os.Args[2:], os.Getpid())
-
-	cmd := exec.Command(os.Args[2], os.Args[3:]...)
-
-	// Setup Stdin, Stdout, Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-    must(syscall.Sethostname([]byte("container")))
-	must(cmd.Run())
-}
-
-func must(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-```
-
-#### 6. Having PS correctly work
+#### Step 4. Having PS correctly work
 
 But if we run `ps` we still have the same list of processes
 
@@ -385,6 +235,8 @@ Step 3: Set the current working directory using `must(os.Chdir("/"))`
 Step 4: Mount the directory `/proc` using `must(syscall.Mount("proc", "proc", "proc", 0, ""))`
 Step 5: Unmount the director `/proc` after the command is completed `must(syscall.Unmount("proc", 0))`
 
+[embedmd]:# (step_4_fix_ps.go /func child/ /\}/)
+
 ```shell
 root@ubuntu-xenial:/src# ls /
 bin   etc                   initrd.img  lost+found  opt   rootfs-alpine  rootfs-fedora  sbin  srv  usr
@@ -404,74 +256,14 @@ exit
 root@ubuntu-xenial:/src#
 ```
 
-```go
-package main
-
-import (
-	"fmt"
-	"os"
-	"os/exec"
-	"syscall"
-)
-
-func main() {
-	if len(os.Args) < 2 {
-		panic("You must have at least two commnad line arguments")
-	}
-	switch os.Args[1] {
-	case "run":
-		run()
-	case "child":
-		child()
-	default:
-		panic("what???")
-	}
-}
-
-func run() {
-	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
-
-	// Setup Stdin, Stdout, Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID,
-	}
-	must(cmd.Run())
-}
-
-func child() {
-	fmt.Printf("running %v as PID %d\n", os.Args[2:], os.Getpid())
-
-	cmd := exec.Command(os.Args[2], os.Args[3:]...)
-
-	// Setup Stdin, Stdout, Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	must(syscall.Sethostname([]byte("container")))
-	must(syscall.Chroot("/rootfs-ubuntu"))
-	must(os.Chdir("/"))
-	must(syscall.Mount("proc", "proc", "proc", 0, ""))
-	must(cmd.Run())
-	must(syscall.Unmount("proc", 0))
-}
-
-func must(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-```
-
 **Potential exploit**
 Check out this potential exploit at this Gist https://gist.github.com/derekbassett/c67c0b129804c55ec3ce2cbdf1412985
 
 #### 7. Overlay File system
 
-This is all great but leads to a problem, if 
+This is all great but we have a problem, if we change the files in container we change it for every instance using that
+filesystem.  The simple solution is to use the overlay(fs) to make the file system read-only.
+
 
 
 #### 8. CGroup

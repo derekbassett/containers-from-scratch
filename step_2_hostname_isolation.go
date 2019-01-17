@@ -1,12 +1,15 @@
+//+build linux
+
 package main
 
 import (
 	"fmt"
 	"os"
 	"os/exec"
+	"syscall"
 )
 
-// go run step_1_no_isolation.go run <cmd> <args>
+// go run main.go run <cmd> <args>
 func main() {
 	if len(os.Args) < 2 {
 		panic("You must have at least two command line arguments")
@@ -27,6 +30,11 @@ func run() {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Cloneflags: syscall.CLONE_NEWUTS,
+	}
+
 	must(cmd.Run())
 }
 
