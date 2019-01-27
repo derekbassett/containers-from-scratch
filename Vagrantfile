@@ -90,10 +90,6 @@ Vagrant.configure("2") do |config|
     touch /I_AM_THE_HOST_ROOTFS
     tar -xzvf /src/ubuntu-rootfs.tar.gz -C /rootfs-ubuntu/
     touch /rootfs-ubuntu/I_AM_CONTAINER_ROOT_FS
-    mkdir -p /diff/
-    touch /diff/I_A_NEW_LAYER_FS
-    mkdir -p /overlay/
-    mkdir -p /workdir/
 
   SHELL
 end

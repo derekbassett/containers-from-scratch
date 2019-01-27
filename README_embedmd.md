@@ -120,6 +120,7 @@ root@ubuntu-xenial:/src#
 The hostname is not modified inside the container.
 
 #### Step 3. Process isolation
+If you can't get the last step to work you can start with `step_2_hostname_isolation.go`
 
 ##### Break it: Run ps with no isolation from inside a container
 
@@ -129,7 +130,7 @@ root@ubuntu-xenial:/src# ps
  2730 pts/0    00:00:00 sudo
  2731 pts/0    00:00:00 bash
  2852 pts/0    00:00:00 ps
-root@ubuntu-xenial:/src# go run step_2_hostname_isolation.go run /bin/bash
+root@ubuntu-xenial:/src# go run main.go run /bin/bash
 Running [/bin/bash]
 root@ubuntu-xenial:/src# ps
   PID TTY          TIME CMD
@@ -178,15 +179,11 @@ No luck, but the reason why this isn't working is because in order to change the
 ##### Fix it Part Two: Re-run with Fork/Exec
 
 Step 1: Duplicate the `run` function and create a `child` function.
-
 Step 2: The run command `exec.Command` function executes `/proc/self/exe` creates a slice starting with the string `"child"`, and then copies
 all the arguments from the second command line argument on, that is what the inner `...` is for, into the `append` function
 which adds it to the slice.  The outer `...` unwinds the slice as variable arguments into Command.
-
 Step 3:. Remove `cmd.SysProcAttr` in the `child` function, since the namespace has already been setup.
-
 Step 4:. Now modify `main` to call `child` if first argument is `child`
-
 Step 5: Set the container name using `must(syscall.Sethostname([]byte("container")))`
 
 The functions are now:
@@ -204,6 +201,7 @@ root@container:/src#
 The command now is now correctly running as PID 1
 
 #### Step 4. Having PS correctly work
+If you can't get the last step to work you can start with `step_3_process_isolation.go`
 
 But if we run `ps` we still have the same list of processes
 
@@ -259,16 +257,45 @@ root@ubuntu-xenial:/src#
 **Potential exploit**
 Check out this potential exploit at this Gist https://gist.github.com/derekbassett/c67c0b129804c55ec3ce2cbdf1412985
 
-#### 7. Overlay File system
+#### Step 5. Overlay File system
+If you can't get the last step to work you can start with `step_4_fix_ps.go`
 
-This is all great but we have a problem, if we change the files in container we change it for every instance using that
-filesystem.  The simple solution is to use the overlay(fs) to make the file system read-only.
+This is all great but we have a problem, if we change the files in container we change those files for every container instance 
+using those files.  The simple solution is to use overlay(fs) to make the ubuntu root file system read-only, and make a new
+modifiable root file system. 
 
+```shell
+root@ubuntu-xenial:/src# go run main.go run /bin/bash
+running [/bin/bash] as PID 1
+root@container:/# ls
+I_AM_CONTAINER_ROOT_FS  bin  boot  dev  etc  home  lib  lib64  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var
+root@container:/# touch NEW_FILE
+root@container:/# ls
+I_AM_CONTAINER_ROOT_FS  NEW_FILE  bin  boot  dev  etc  home  lib  lib64  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var
+root@container:/# exit
+exit
+root@ubuntu-xenial:/src# ls /rootfs-ubuntu
+bin  boot  dev  etc  home  I_AM_CONTAINER_ROOT_FS  lib  lib64  media  mnt  NEW_FILE  opt  proc  root  run  sbin  srv  sys  tmp  usr  var
+```
 
+Use an overlay file system
 
-#### 8. CGroup
+```shell
+root@ubuntu-xenial:/src# go run main.go run /bin/bash
+running [/bin/bash] as PID 1
+root@container:/# mkdir base diff overlay workdir
+root@container:/# touch base/MY_BASE_FILE
+root@container:/# mount -t overlay -o lowerdir=base,upperdir=diff,workdir=workdir overlay overlay
+```
 
-What can they use
+We now have an overlay directory.  If you write into 
+
+##### Fix It: Make an overlay file system
+
+# TODO: Figure out how to do this.
+
+#### Step 6. CGroup
+
 Namespaces are what you can see. CGroups what you can use, and allow you to control the resources.  
 
 Follow along with the group:

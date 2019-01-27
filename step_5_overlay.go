@@ -50,13 +50,9 @@ func child() {
 	must(syscall.Sethostname([]byte("container")))
 	must(syscall.Chroot("/rootfs-ubuntu"))
 	must(os.Chdir("/"))
-	must(syscall.Mount("overlay", "overlay", "overlay", 0, "lowerdir=/,upperdir=/diff,workdir=/workdir"))
-	must(syscall.Chroot("/overlay"))
-	must(os.Chdir("/"))
-	//must(syscall.Mount("proc", "proc", "proc", 0, ""))
+	must(syscall.Mount("proc", "proc", "proc", 0, ""))
 	must(cmd.Run())
-	//must(syscall.Unmount("proc", 0))
-	must(syscall.Unmount("overlay", 0))
+	must(syscall.Unmount("proc", 0))
 }
 
 func must(err error) {
