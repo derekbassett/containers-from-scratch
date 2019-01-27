@@ -55,45 +55,6 @@ root@ubuntu-xenial:~# cd /src
 We are going to start with a very basic application.  Takes in a set of command line arguments and executes a command.
 
 [embedmd]:# (step_1_no_isolation.go)
-```go
-package main
-
-import (
-	"fmt"
-	"os"
-	"os/exec"
-)
-
-// go run step_1_no_isolation.go run <cmd> <args>
-func main() {
-	if len(os.Args) < 2 {
-		panic("You must have at least two command line arguments")
-	}
-	switch os.Args[1] {
-	case "run":
-		run()
-	default:
-		panic("unknown command")
-	}
-}
-
-func run() {
-	fmt.Printf("running %v as PID %d\n", os.Args[2:], os.Getpid())
-
-	cmd := exec.Command(os.Args[2], os.Args[3:]...)
-	// Setup Stdin, Stdout, Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	must(cmd.Run())
-}
-
-func must(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-```
 
 ```shell
 root@ubuntu-xenial:/src# go run main.go run echo "Hello World"
@@ -133,23 +94,10 @@ root@ubuntu-xenial:/src# hostname ubuntu-xenial
 Step 1: Add the following to main.go a `syscall` in the imports, and the following after `cmd.Stderr = os.Stderr`
 
 [embedmd]:# (step_2_hostname_isolation.go /cmd.SysProcAttr/ /\}/)
-```go
-cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS,
-	}
-```
 
 And the following to the import section
 
 [embedmd]:# (step_2_hostname_isolation.go /import/ /\)/)
-```go
-import (
-	"fmt"
-	"os"
-	"os/exec"
-	"syscall"
-)
-```
 
 `syscall.CLONE_NEWUTS` stands for clone new Unix Time Sharing System and the import section is required to access the syscall
 package.
@@ -204,11 +152,6 @@ The list of processes include the parent process
 Add the following to the main.go inside the `SysProcAttr`
 
 [embedmd]:# (step_3_process_isolation.go /cmd.SysProcAttr/ /\}/)
-```go
-cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID,
-	}
-```
 
 ```shell
 root@ubuntu-xenial:/src# ps
@@ -258,54 +201,6 @@ Step 5: Set the container name using `must(syscall.Sethostname([]byte("container
 The functions are now:
 
 [embedmd]:# (step_3_process_isolation.go /func main/ $)
-```go
-func main() {
-	if len(os.Args) < 2 {
-		panic("You must have at least two commnad line arguments")
-	}
-	switch os.Args[1] {
-	case "run":
-		run()
-	case "child":
-		child()
-	default:
-		panic("what???")
-	}
-}
-
-func run() {
-	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
-
-	// Setup Stdin, Stdout, Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID,
-	}
-	must(cmd.Run())
-}
-
-func child() {
-	fmt.Printf("running %v as PID %d\n", os.Args[2:], os.Getpid())
-
-	cmd := exec.Command(os.Args[2], os.Args[3:]...)
-
-	// Setup Stdin, Stdout, Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	must(syscall.Sethostname([]byte("container")))
-	must(cmd.Run())
-}
-
-func must(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-```
 
 Run the command again
 
@@ -356,25 +251,6 @@ Step 5: Unmount the director `/proc` after the command is completed `must(syscal
 
 
 [embedmd]:# (step_4_fix_ps.go /func child/ /\}/)
-```go
-func child() {
-	fmt.Printf("running %v as PID %d\n", os.Args[2:], os.Getpid())
-
-	cmd := exec.Command(os.Args[2], os.Args[3:]...)
-
-	// Setup Stdin, Stdout, Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	must(syscall.Sethostname([]byte("container")))
-	must(syscall.Chroot("/rootfs-ubuntu"))
-	must(os.Chdir("/"))
-	must(syscall.Mount("proc", "proc", "proc", 0, ""))
-	must(cmd.Run())
-	must(syscall.Unmount("proc", 0))
-}
-```
 
 ```shell
 root@ubuntu-xenial:/src# ls /
@@ -467,55 +343,12 @@ root@ubuntu-xenial:/sys/fs/cgroup/memory#
 
 Step 1: Transfer this code into main.go
 [embedmd]:# (step_6_cgroup.go /func cg/ /\}/)
-```go
-func cg(name string) {
-	cgroups := "/sys/fs/cgroup/"
-	pids := filepath.Join(cgroups, "pids")
-	os.MkdirAll(filepath.Join(pids, name), 0755)
-	must(ioutil.WriteFile(filepath.Join(pids, name, "pids.max"), []byte("20"), 0700))
-	// Removes the new cgroup in place after the container exits
-	must(ioutil.WriteFile(filepath.Join(pids, name, "notify_on_release"), []byte("1"), 0700))
-	must(ioutil.WriteFile(filepath.Join(pids, name, "cgroup.procs"), []byte(strconv.Itoa(os.Getpid())), 0700))
-}
-```
 
 Step 2: Add the following line to `child()`
 [embedmd]:# (step_6_cgroup.go /func child/ /\}/)
-```go
-func child() {
-	fmt.Printf("running %v as PID %d\n", os.Args[2:], os.Getpid())
-
-	cg("scratch")
-
-	cmd := exec.Command(os.Args[2], os.Args[3:]...)
-
-	// Setup Stdin, Stdout, Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	must(syscall.Sethostname([]byte("container")))
-	must(syscall.Chroot("/rootfs-ubuntu"))
-	must(os.Chdir("/"))
-	must(syscall.Mount("proc", "proc", "proc", 0, ""))
-	must(cmd.Run())
-	must(syscall.Unmount("proc", 0))
-}
-```
 
 Step 3: Add the following import
 [embedmd]:# (step_6_cgroup.go /import/ /\)/)
-```go
-import (
-	"fmt"
-	"io/ioutil"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strconv"
-	"syscall"
-)
-```
 
 ##### Fork Bomb
 **WARNING THIS CAN IF PUT IN THE WRONG TERMINAL CAUSE YOU TO HAVE TO REBOOT YOUR MACHINE**

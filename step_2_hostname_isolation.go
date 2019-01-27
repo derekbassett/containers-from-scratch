@@ -1,9 +1,12 @@
+//+build linux
+
 package main
 
 import (
 	"fmt"
 	"os"
 	"os/exec"
+	"syscall"
 )
 
 // go run main.go run <cmd> <args>
@@ -27,6 +30,11 @@ func run() {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Cloneflags: syscall.CLONE_NEWUTS,
+	}
+
 	must(cmd.Run())
 }
 
