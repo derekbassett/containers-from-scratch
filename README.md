@@ -233,6 +233,13 @@ root@ubuntu-xenial:/src#
 
 No luck, but the reason why this isn't working is because in order to change the pid we need to fork/exec
 
+##### What is Fork/Exec
+
+`fork()` is a system call that a parent process uses to divide itself into two identical processes. 
+After calling fork the created child process is is an exact copy of the parent except for the return value. 
+In some cases the two continue to run the same binary, but often one (the child) switches to running another binary executable  
+using the `exec()` system call.
+
 ##### Fix it Part Two: Re-run with Fork/Exec
 
 Step 1: Duplicate the `run` function and create a `child` function.
@@ -459,7 +466,8 @@ root@ubuntu-xenial:/sys/fs/cgroup/memory#
 ```
 
 Step 1: Transfer this code into main.go
-```
+[embedmd]:# (step_6_cgroup.go /func cg/ /\}/)
+```go
 func cg(name string) {
 	cgroups := "/sys/fs/cgroup/"
 	pids := filepath.Join(cgroups, "pids")
@@ -470,60 +478,10 @@ func cg(name string) {
 	must(ioutil.WriteFile(filepath.Join(pids, name, "cgroup.procs"), []byte(strconv.Itoa(os.Getpid())), 0700))
 }
 ```
+
 Step 2: Add the following line to `child()`
-```
-    cg("scratch")
-```
-Step 3: Add the following import
-```
-    "io/ioutil"
-    "path/filepath"
-    "strconv"
-
-```
-
+[embedmd]:# (step_6_cgroup.go /func child/ /\}/)
 ```go
-package main
-
-import (
-	"fmt"
-	"io/ioutil"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strconv"
-	"syscall"
-)
-
-// go run main.go run <cmd> <args>
-func main() {
-	if len(os.Args) < 2 {
-		panic("You must have at least two commnad line arguments")
-	}
-	switch os.Args[1] {
-	case "run":
-		run()
-	case "child":
-		child()
-	default:
-		panic("what???")
-	}
-}
-
-func run() {
-	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
-
-	// Setup Stdin, Stdout, Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
-		Unshareflags: syscall.CLONE_NEWNS,
-	}
-	must(cmd.Run())
-}
-
 func child() {
 	fmt.Printf("running %v as PID %d\n", os.Args[2:], os.Getpid())
 
@@ -543,22 +501,20 @@ func child() {
 	must(cmd.Run())
 	must(syscall.Unmount("proc", 0))
 }
+```
 
-func cg(name string) {
-	cgroups := "/sys/fs/cgroup/"
-	pids := filepath.Join(cgroups, "pids")
-	os.MkdirAll(filepath.Join(pids, name), 0755)
-	must(ioutil.WriteFile(filepath.Join(pids, name, "pids.max"), []byte("20"), 0700))
-	// Removes the new cgroup in place after the container exits
-	must(ioutil.WriteFile(filepath.Join(pids, name, "notify_on_release"), []byte("1"), 0700))
-	must(ioutil.WriteFile(filepath.Join(pids, name, "cgroup.procs"), []byte(strconv.Itoa(os.Getpid())), 0700))
-}
-
-func must(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
+Step 3: Add the following import
+[embedmd]:# (step_6_cgroup.go /import/ /\)/)
+```go
+import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"syscall"
+)
 ```
 
 ##### Fork Bomb
