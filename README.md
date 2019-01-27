@@ -155,7 +155,7 @@ import (
 package.
 
 ```shell
-root@ubuntu-xenial:/src# go run step_2_hostname_isolation.go run /bin/bash
+root@ubuntu-xenial:/src# go run main.go run /bin/bash
 Running [/bin/bash]
 root@ubuntu-xenial:/src# hostname
 ubuntu-xenial
@@ -236,12 +236,17 @@ No luck, but the reason why this isn't working is because in order to change the
 ##### Fix it Part Two: Re-run with Fork/Exec
 
 Step 1: Duplicate the `run` function and create a `child` function.
+
 Step 2: The run command `exec.Command` function executes `/proc/self/exe` creates a slice starting with the string `"child"`, and then copies
 all the arguments from the second command line argument on, that is what the inner `...` is for, into the `append` function
 which adds it to the slice.  The outer `...` unwinds the slice as variable arguments into Command.
+
 Step 3:. Remove `cmd.SysProcAttr` in the `child` function, since the namespace has already been setup.
+
 Step 4:. Now modify `main` to call `child` if first argument is `child`
+
 Step 5: Set the container name using `must(syscall.Sethostname([]byte("container")))`
+
 
 The functions are now:
 
@@ -333,10 +338,15 @@ it's own file system.
 Included in the Vagrant file system with another root filesystem.  
 
 Step 1: Add the following Commands into `child`
+
 Step 2: Set the root directory using `must(syscall.Chroot("/rootfs-ubuntu"))`
+
 Step 3: Set the current working directory using `must(os.Chdir("/"))`
+
 Step 4: Mount the directory `/proc` using `must(syscall.Mount("proc", "proc", "proc", 0, ""))`
+
 Step 5: Unmount the director `/proc` after the command is completed `must(syscall.Unmount("proc", 0))`
+
 
 [embedmd]:# (step_4_fix_ps.go /func child/ /\}/)
 ```go
