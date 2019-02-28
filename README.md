@@ -40,7 +40,7 @@ $ vagrant box update
 
 Worse case scenario sometimes the box can get into a wonky state if it has been weeks since you
  have run the demo.  If that happens, delete the box and rerun `vagrant up`.  This is also the
-likely fix if source files in this directory do not appear under `/src` in the vagrant box. 
+likely fix if source files in this directory do not appear under `/src` in the vagrant box.
 
 Need to be running as Root
 
@@ -96,9 +96,9 @@ func must(err error) {
 ```
 
 ```shell
-root@ubuntu-xenial:/src# go run main.go run echo "Hello World"
-Running [echo Hello World]
-Hello World
+root@ubuntu-xenial:/src# go run main.go run uname -a
+Running [uname -a]
+Linux ubuntu-xenial 4.4.0-142-generic #168-Ubuntu SMP Wed Jan 16 21:00:45 UTC 2019 x86_64 x86_64 x86_64 GNU/Linux
 ```
 
 #### Step 2. Hostname isolation
@@ -235,8 +235,8 @@ No luck, but the reason why this isn't working is because in order to change the
 
 ##### What is Fork/Exec
 
-`fork()` is a system call that a parent process uses to divide itself into two identical processes. 
-After calling fork the created child process is is an exact copy of the parent except for the return value. 
+`fork()` is a system call that a parent process uses to divide itself into two identical processes.
+After calling fork the created child process is is an exact copy of the parent except for the return value.
 In some cases the two continue to run the same binary, but often one (the child) switches to running another binary executable  
 using the `exec()` system call.
 
@@ -261,7 +261,7 @@ The functions are now:
 ```go
 func main() {
 	if len(os.Args) < 2 {
-		panic("You must have at least two commnad line arguments")
+		panic("You must have at least two command line arguments")
 	}
 	switch os.Args[1] {
 	case "run":
@@ -352,7 +352,7 @@ Step 3: Set the current working directory using `must(os.Chdir("/"))`
 
 Step 4: Mount the directory `/proc` using `must(syscall.Mount("proc", "proc", "proc", 0, ""))`
 
-Step 5: Unmount the director `/proc` after the command is completed `must(syscall.Unmount("proc", 0))`
+Step 5: Unmount the director `/proc` the mount command is completed with `defer func() { must(syscall.Unmount("proc", 0)) }()`
 
 
 [embedmd]:# (step_4_fix_ps.go /func child/ /\}/)
@@ -371,9 +371,9 @@ func child() {
 	must(syscall.Chroot("/rootfs-ubuntu"))
 	must(os.Chdir("/"))
 	must(syscall.Mount("proc", "proc", "proc", 0, ""))
-	must(cmd.Run())
-	must(syscall.Unmount("proc", 0))
-}
+	defer func() {
+		must(syscall.Unmount("proc", 0))
+	}
 ```
 
 ```shell
@@ -401,9 +401,9 @@ Check out this potential exploit at this Gist https://gist.github.com/derekbasse
 #### Step 5. Overlay File system
 If you can't get the last step to work you can start with `step_4_fix_ps.go`
 
-This is all great but we have a problem, if we change the files in container we change those files for every container instance 
+This is all great but we have a problem, if we change the files in container we change those files for every container instance
 using those files.  The simple solution is to use overlay(fs) to make the ubuntu root file system read-only, and make a new
-modifiable root file system. 
+modifiable root file system.
 
 ```shell
 root@ubuntu-xenial:/src# go run main.go run /bin/bash
@@ -427,13 +427,27 @@ running [/bin/bash] as PID 1
 root@container:/# mkdir base diff overlay workdir
 root@container:/# touch base/MY_BASE_FILE
 root@container:/# mount -t overlay -o lowerdir=base,upperdir=diff,workdir=workdir overlay overlay
+root@container:/# cd overlay
+root@container:/overlay# ls
+MY_BASE_FILE
+root@container:/overlay# touch MY_DIFF_FILE
+root@container:/overlay# ls
+MY_BASE_FILE  MY_DIFF_FILE
+root@container:/overlay# cd ../base
+root@container:/base# ls
+MY_BASE_FILE
 ```
 
-We now have an overlay directory.  If you write into 
+We now have an overlay directory.  If you write into special directory you will not modify your base directory.
 
-##### Fix It: Make an overlay file system
+And cleanup
 
-# TODO: Figure out how to do this.
+```shell
+root@container:/# umount overlay
+root@container:/# rm -r base diff overlay workdir 
+```
+
+##### *Challenge: Make an overlay file system*
 
 #### Step 6. CGroup
 
@@ -466,6 +480,7 @@ root@ubuntu-xenial:/sys/fs/cgroup/memory#
 ```
 
 Step 1: Transfer this code into main.go
+
 [embedmd]:# (step_6_cgroup.go /func cg/ /\}/)
 ```go
 func cg(name string) {
@@ -480,6 +495,7 @@ func cg(name string) {
 ```
 
 Step 2: Add the following line to `child()`
+
 [embedmd]:# (step_6_cgroup.go /func child/ /\}/)
 ```go
 func child() {
@@ -498,12 +514,13 @@ func child() {
 	must(syscall.Chroot("/rootfs-ubuntu"))
 	must(os.Chdir("/"))
 	must(syscall.Mount("proc", "proc", "proc", 0, ""))
-	must(cmd.Run())
-	must(syscall.Unmount("proc", 0))
-}
+	defer func() {
+		must(syscall.Unmount("proc", 0))
+	}
 ```
 
 Step 3: Add the following import
+
 [embedmd]:# (step_6_cgroup.go /import/ /\)/)
 ```go
 import (

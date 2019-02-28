@@ -12,7 +12,7 @@ import (
 // go run main.go run <cmd> <args>
 func main() {
 	if len(os.Args) < 2 {
-		panic("You must have at least two commnad line arguments")
+		panic("You must have at least two command line arguments")
 	}
 	switch os.Args[1] {
 	case "run":

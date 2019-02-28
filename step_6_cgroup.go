@@ -15,7 +15,7 @@ import (
 // go run main.go run <cmd> <args>
 func main() {
 	if len(os.Args) < 2 {
-		panic("You must have at least two commnad line arguments")
+		panic("You must have at least two command line arguments")
 	}
 	switch os.Args[1] {
 	case "run":
@@ -56,8 +56,10 @@ func child() {
 	must(syscall.Chroot("/rootfs-ubuntu"))
 	must(os.Chdir("/"))
 	must(syscall.Mount("proc", "proc", "proc", 0, ""))
+	defer func() {
+		must(syscall.Unmount("proc", 0))
+	}()
 	must(cmd.Run())
-	must(syscall.Unmount("proc", 0))
 }
 
 func cg(name string) {
