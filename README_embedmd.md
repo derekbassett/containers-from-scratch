@@ -54,7 +54,7 @@ root@ubuntu-xenial:~# cd /src
 
 We are going to start with a very basic application.  Takes in a set of command line arguments and executes a command.
 
-[embedmd]:# (step_1_no_isolation.go)
+[embedmd]:# (step_1/step_1_no_isolation.go)
 
 ```shell
 root@ubuntu-xenial:/src# go run main.go run uname -a
@@ -93,11 +93,11 @@ root@ubuntu-xenial:/src# hostname ubuntu-xenial
 
 Step 1: Add the following to main.go a `syscall` in the imports, and the following after `cmd.Stderr = os.Stderr`
 
-[embedmd]:# (step_2_hostname_isolation.go /cmd.SysProcAttr/ /\}/)
+[embedmd]:# (step_2/step_2_hostname_isolation.go /cmd.SysProcAttr/ /\}/)
 
 And the following to the import section
 
-[embedmd]:# (step_2_hostname_isolation.go /import/ /\)/)
+[embedmd]:# (step_2/step_2_hostname_isolation.go /import/ /\)/)
 
 `syscall.CLONE_NEWUTS` stands for clone new Unix Time Sharing System and the import section is required to access the syscall
 package.
@@ -120,7 +120,7 @@ root@ubuntu-xenial:/src#
 The hostname is not modified inside the container.
 
 #### Step 3. Process isolation
-If you can't get the last step to work you can start with `step_2_hostname_isolation.go`
+If you can't get the last step to work you can start with `step_2/step_2_hostname_isolation.go`
 
 ##### Break it: Run ps with no isolation from inside a container
 
@@ -151,7 +151,7 @@ The list of processes include the parent process
 
 Add the following to the main.go inside the `SysProcAttr`
 
-[embedmd]:# (step_3_process_isolation.go /cmd.SysProcAttr/ /\}/)
+[embedmd]:# (step_3/step_3_process_isolation.go /cmd.SysProcAttr/ /\}/)
 
 ```shell
 root@ubuntu-xenial:/src# ps
@@ -200,7 +200,7 @@ Step 5: Set the container name using `must(syscall.Sethostname([]byte("container
 
 The functions are now:
 
-[embedmd]:# (step_3_process_isolation.go /func main/ $)
+[embedmd]:# (step_3/step_3_process_isolation.go /func main/ $)
 
 Run the command again
 
@@ -213,7 +213,7 @@ root@container:/src#
 The command now is now correctly running as PID 1
 
 #### Step 4. Having PS correctly work
-If you can't get the last step to work you can start with `step_3_process_isolation.go`
+If you can't get the last step to work you can start with `step_3/step_3_process_isolation.go`
 
 But if we run `ps` we still have the same list of processes
 
@@ -250,7 +250,7 @@ Step 4: Mount the directory `/proc` using `must(syscall.Mount("proc", "proc", "p
 Step 5: Unmount the director `/proc` the mount command is completed with `defer func() { must(syscall.Unmount("proc", 0)) }()`
 
 
-[embedmd]:# (step_4_fix_ps.go /func child/ /\}/)
+[embedmd]:# (step_4/step_4_fix_ps.go /func child/ /\}/)
 
 ```shell
 root@ubuntu-xenial:/src# ls /
@@ -275,7 +275,7 @@ root@ubuntu-xenial:/src#
 Check out this potential exploit at this Gist https://gist.github.com/derekbassett/c67c0b129804c55ec3ce2cbdf1412985
 
 #### Step 5. Overlay File system
-If you can't get the last step to work you can start with `step_4_fix_ps.go`
+If you can't get the last step to work you can start with `step_4/step_4_fix_ps.go`
 
 This is all great but we have a problem, if we change the files in container we change those files for every container instance
 using those files.  The simple solution is to use overlay(fs) to make the ubuntu root file system read-only, and make a new
@@ -357,15 +357,15 @@ root@ubuntu-xenial:/sys/fs/cgroup/memory#
 
 Step 1: Transfer this code into main.go
 
-[embedmd]:# (step_6_cgroup.go /func cg/ /\}/)
+[embedmd]:# (step_6/step_6_cgroup.go /func cg/ /\}/)
 
 Step 2: Add the following line to `child()`
 
-[embedmd]:# (step_6_cgroup.go /func child/ /\}/)
+[embedmd]:# (step_6/step_6_cgroup.go /func child/ /\}/)
 
 Step 3: Add the following import
 
-[embedmd]:# (step_6_cgroup.go /import/ /\)/)
+[embedmd]:# (step_6/step_6_cgroup.go /import/ /\)/)
 
 ##### Fork Bomb
 **WARNING THIS CAN IF PUT IN THE WRONG TERMINAL CAUSE YOU TO HAVE TO REBOOT YOUR MACHINE**
